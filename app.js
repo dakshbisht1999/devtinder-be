@@ -78,6 +78,15 @@ connectDB()
             err.message = "Invalid Token! Unauthorized access.";
         }
 
+        // --- SSL/TLS Upstream Errors (NEW LOGIC) ---
+        if (err.message && err.message.includes("tlsv1 alert internal error")) {
+            err.statusCode = 502; // 502 Bad Gateway (Upstream server error)
+            // Give a clean message to the client instead of the ugly OpenSSL stack trace
+            err.message = "Failed to connect to an external service due to a secure connection error."; 
+            
+            // // Optional: You might want to log the exact error to your console for debugging
+            // console.error("External API SSL Error:", err);
+        }
 
         // err.statusCode and err.message from coming from the AppError.js
         // console.log("custom errorStatusCode", err.statusCode);
