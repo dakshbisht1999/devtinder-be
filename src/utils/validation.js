@@ -4,14 +4,14 @@ const validator = require("validator");
 const bcrypt = require("bcrypt");
 
 const validateSignupData = async (req) => {
-    const { firstName, lastName, emailId, password, age } = req.body;
+    const { firstName, lastName, emailId, password, age, dob } = req.body;
     
-    if (!firstName || !lastName || !password || !age) {
+    if (!firstName || !lastName || !password || !age || !dob) {
         // const err = new Error("Please provide all required fields");
         // err.statusCode = 400;
         // throw err;
 
-        throw new AppError("Name is not valid!", 400);
+        throw new AppError("Invalid Data!", 400);
     } else if (!emailId || !validator.isEmail(emailId)){
         throw new AppError("Email is not valid!", 400);
     } else if (!password || !validator.isStrongPassword(password)){

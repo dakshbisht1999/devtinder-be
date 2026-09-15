@@ -55,6 +55,10 @@ const userSchema = new mongoose.Schema({
             message: "{VALUE} is not a valid gender!"
         }
     },
+    dob:{
+        type: String,
+        required: true
+    },
     age:{
         type: Number,
         required: true,
