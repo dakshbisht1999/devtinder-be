@@ -4,6 +4,7 @@ const profileRouter = express.Router();
 const { UserModel } = require("./../../models/user");
 const {AppError} = require("./../../utils/AppError");
 const bcrypt = require("bcrypt");
+const { connectionRequestModel } = require("../../models/connectionRequest");
 
 // GET Profile API - get user information
 profileRouter.get("/view", (req,res,next)=>{
@@ -92,6 +93,16 @@ profileRouter.delete("/delete", async(req,res,next)=>{
         const userId = user._id;
         const isDeleted = await UserModel.findByIdAndDelete(userId);
         if(!isDeleted) throw new AppError("Enter valid userId",400);
+
+        //after deleting the profile, delete all the connections related to that profile
+        const deletedConnections = await connectionRequestModel.deleteMany({
+            $or: [
+                { fromUserId: userId },
+                { toUserId: userId }
+            ]
+        });
+        if(!deletedConnections) throw new AppError("Unable to delete connections",500)
+        
         
         res.send({
             message: "User profile deleted successfully",
