@@ -30,7 +30,7 @@ profileRouter.patch("/edit", async(req,res,next)=>{
         const user = req.user.toObject();
         const userId = user._id;
         const data = req.body;
-        if(data.password || data.firstName || data.lastName || data.emailId){
+        if(data.password || data.emailId){
             // delete data.password || data['password']
             // console.log('deleted password')
             throw new AppError("Update not allowed!",400)
