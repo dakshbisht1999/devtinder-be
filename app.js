@@ -100,7 +100,7 @@ connectDB()
         })
     });
 
-    app.listen(7777,()=>{
+    app.listen(process.env.PORT,()=>{
         console.log("Server running on port:7777");
     });
 }).catch((err)=>{
