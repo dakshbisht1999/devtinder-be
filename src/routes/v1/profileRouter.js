@@ -36,23 +36,14 @@ profileRouter.patch("/edit", async(req,res,next)=>{
             // console.log('deleted password')
             throw new AppError("Update not allowed!",400)
         }
-        if(userId){
-            // const user = await UserModel.findByIdAndUpdate({_id: userId}, data);
-            const user = await UserModel.findByIdAndUpdate(userId, data, {runValidators:true, returnDocument:'after'});
-            if(!user) throw new AppError("Enter valid userId",400);
-            
-            res.send({
-                message: "Profile updated successfully",
-                success: true
-            });
-        }
-        // if (!userId && emailId) { //update via email
-        //     const user = await UserModel.findOneAndUpdate({emailId: emailId}, data, {runValidators:true, returnDocument:'after'});
-        //     if(!user) throw new AppError("Enter valid emailId",400);
-            
-        //     res.send("User updated successfully via email");
-        // }
-        throw new AppError("Enter either userId or emailId to update the user.", 400);
+
+        const userUpdated = await UserModel.findByIdAndUpdate(userId, data, {runValidators:true, returnDocument:'after'});
+        if(!userUpdated) throw new AppError("Enter valid userId",400);
+        
+        res.send({
+            message: "Profile updated successfully",
+            success: true
+        });
     } catch (error){
         next(error);
     }
