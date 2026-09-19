@@ -171,6 +171,22 @@ userRouter.get("/connections", async (req,res,next)=>{
     }
 })
 
+userRouter.delete("/connection/remove/:connectionId", async (req,res,next)=>{
+    try{
+        const connectionId = req.params.connectionId;
+
+        const isRemoved = await connectionRequestModel.findByIdAndDelete(connectionId);
+        if(!isRemoved) throw new AppError("Enter valid connectionId",400);
+
+        res.send({
+            message: "Connection removed successfully",
+            success: true
+        });
+    } catch (error){
+        next(error)
+    }
+})
+
 // GET - Feed API
 userRouter.get("/feed", async(req,res,next)=>{
     try{
