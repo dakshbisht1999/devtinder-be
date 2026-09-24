@@ -32,6 +32,11 @@ jobs:
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            # Load NVM / system environment paths so npm and pm2 commands are recognized
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+            export PATH=$PATH:/usr/local/bin:$HOME/.nvm/versions/node/$(nvm current 2>/dev/null)/bin
+
             # Create app folder if it doesn't exist
             mkdir -p ~/devtinder-be
             
@@ -42,4 +47,4 @@ jobs:
             # Navigate to folder, install dependencies, restart PM2
             cd ~/devtinder-be
             npm ci --production
-            pm2 restart all --update-env
+            pm2 restart all --update-env || pm2 start app.js --name "dt-be"
