@@ -4,7 +4,12 @@ require("dotenv").config();
 const connectDB = async () => {
     // console.log("mongo_uri_devtinder", process.env.MONGO_URI_DEVTINDER)
     await mongoose.connect(
-        process.env.MONGO_URI_DEVTINDER
+        process.env.MONGO_URI_DEVTINDER,
+        {
+            maxPoolSize: 10, // Keeps pre-warmed TCP sockets ready
+            serverSelectionTimeoutMS: 5000, // Fails fast (5s) instead of hanging if Atlas drops
+            socketTimeoutMS: 45000, // Closes inactive sockets to prevent stale connections
+        }
     );
 }
 
