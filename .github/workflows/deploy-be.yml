@@ -1,0 +1,45 @@
+name: Deploy DevTinder Backend to EC2
+
+on:
+  push:
+    branches:
+      - main  # or master
+    paths-ignore:
+      - '**.md'
+
+jobs:
+  deploy:
+    if: ${{ startsWith(github.event.head_commit.message, 'deploy:') || startsWith(github.event.head_commit.message, 'DEPLOY:') || startsWith(github.event.head_commit.message, 'Deploy:') }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Copy Backend Code to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "./*"
+          target: "/tmp/devtinder-be-source"
+
+      - name: Install Dependencies & Restart PM2
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            # Create app folder if it doesn't exist
+            mkdir -p ~/devtinder-be
+            
+            # Sync source files into app folder (preserving .env)
+            rsync -av --exclude='.env' /tmp/devtinder-be-source/ ~/devtinder-be/
+            rm -rf /tmp/devtinder-be-source
+            
+            # Navigate to folder, install dependencies, restart PM2
+            cd ~/devtinder-be
+            npm ci --production
+            pm2 restart all --update-env

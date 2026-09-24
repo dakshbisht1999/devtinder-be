@@ -4,7 +4,7 @@ const authRouter = express.Router();
 const {adminAuth, userAuth} = require("./../../middlewares/auth");
 const { UserModel } = require("./../../models/user");
 const {AppError} = require("./../../utils/AppError");
-const {validateSignupData, validateLoginData} = require("./../../utils/validation");
+const {validateSignupData, validateLoginData, validateEmailData} = require("./../../utils/validation");
 const bcrypt = require("bcrypt");
 const cookieParser = require('cookie-parser');
 const jwt = require("jsonwebtoken");
@@ -81,6 +81,46 @@ authRouter.post("/login", async (req,res,next)=>{
         next(error);
     }
     
+});
+
+// Temp Email check API
+authRouter.post("/email",async(req,res,next)=>{
+    try{
+        // Validation of Data
+        await validateEmailData(req);
+        // console.log("hi")
+
+        const {
+            emailComingFrom,
+            subject,
+            message,
+            emailId, 
+            name
+        } = req.body;
+        
+        // console.log("saved the data");
+        // const userDocument = await UserModel.findOne({emailId: req.body.emailId}); //returns document/json object
+        // const userId = userDocument._id.toString(); //need to convert _id into string using .toString();
+        // console.log(userId);
+        // 201 status ka matlab hota hai "Created Successfully"
+        res.status(201).send({
+            message: "Email sent successfully",
+            success: true,
+            data: {
+                emailComingFrom,
+                subject,
+                message,
+                emailId, 
+                name
+            }
+        });
+    } catch(error){
+        // res.status(400).send("Error saving the user: ", error);
+        
+        // Agar upar wale throw chalenge, ya database crash hoga, 
+        // toh wo sab yahan aayenge aur Global Handler ke paas chale jayenge
+        next(error);
+    }
 });
 
 // Logout API

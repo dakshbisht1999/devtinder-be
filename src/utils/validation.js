@@ -45,4 +45,24 @@ const validateLoginData = async (req) => {
     return user;
 }
 
-module.exports = {validateSignupData, validateLoginData}
+const validateEmailData = async (req) => {
+    const {
+        emailComingFrom,
+        subject,
+        message,
+        emailId, 
+        name
+    } = req.body;
+
+    if (!emailComingFrom || !subject || !message || !emailId || !name) {
+        // const err = new Error("Please provide all required fields");
+        // err.statusCode = 400;
+        // throw err;
+
+        throw new AppError("Invalid Data!", 400);
+    } else if (!emailId || !validator.isEmail(emailId)){
+        throw new AppError("Email is not valid!", 400);
+    }
+}
+
+module.exports = {validateSignupData, validateLoginData, validateEmailData}
