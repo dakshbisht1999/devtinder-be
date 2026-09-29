@@ -1,8 +1,14 @@
 # authRouter
+
+> Portfolio/demo environment: set `AWS_SES_SANDBOX=true` while AWS SES is in sandbox mode. Relevant responses then include `emailServiceNotice`, which the frontend should display to explain that email can only reach SES-verified identities. Remove or set this to `false` after SES production access is approved.
+
 POST - /auth/signup
 POST - /auth/login
 POST - /auth/logout
-PATCH - /auth/password/reset  // using otp on email
+POST - /auth/forget-password-via-otp        // body: { emailId }; sends a six-digit OTP
+POST - /auth/forget-password-via-otp/reset  // body: { emailId, otp, newPassword }
+POST - /auth/email-verification              // authenticated; sends a six-digit OTP
+POST - /auth/email-verification/verify       // authenticated; body: { otp }
 
 
 # profileRouter

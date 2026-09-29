@@ -81,6 +81,18 @@ const userSchema = new mongoose.Schema({
     skills:{
         type: [String]
     },
+    passwordResetOtpHash: String,
+    passwordResetOtpExpiresAt: Date,
+    emailVerificationOtpHash: String,
+    emailVerificationOtpExpiresAt: Date,
+    isEmailVerified: {
+        type: Boolean,
+        default: false
+    },
+    tokenVersion: {
+        type: Number,
+        default: 0
+    },
     // roles: {
     //     type: [String],
     //     enum: ['user', 'editor', 'admin'],
@@ -95,7 +107,8 @@ userSchema.methods.getJWT = async function() {
 
     const token = await jwt.sign(
         {
-            _id: user._id
+            _id: user._id,
+            tokenVersion: user.tokenVersion
         },
         process.env.DEVTINDER_JWT_SECRET_KEY,
         {

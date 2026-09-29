@@ -47,7 +47,7 @@ const run = async (portal,
             emailId, 
             name) => {
     const sendEmailCommand = createSendEmailCommand(
-        "dakshbisht1999@gmail.com",
+        process.env.PERSONAL_EMAIL,
         portal+"@dishantbisht.in",
         emailId, name, subject, message
     );

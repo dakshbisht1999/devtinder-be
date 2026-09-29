@@ -4,6 +4,20 @@ const requestRouter = express.Router();
 const { UserModel } = require("./../../models/user");
 const {AppError} = require("./../../utils/AppError");
 const { connectionRequestModel } = require("../../models/connectionRequest");
+const { sendEmail, getEmailServiceNotice } = require("../../utils/sendEmail");
+
+const fullName = (user) => `${user.firstName} ${user.lastName}`.trim();
+const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+}[character]));
+const sendNotification = async (message) => {
+    try {
+        await sendEmail(message);
+    } catch (error) {
+        // The connection change has already succeeded; keep the API reliable if SES is unavailable.
+        console.error("Unable to send connection notification:", error.message);
+    }
+};
 
 
 requestRouter.post("/send/:status/:toUserId", async (req, res, next)=>{
@@ -33,10 +47,20 @@ requestRouter.post("/send/:status/:toUserId", async (req, res, next)=>{
         })
         const data = await connectionRequest.save();
 
+        if (status === "interested") {
+            await sendNotification({
+                to: toUser.emailId,
+                subject: "You have a new DevTinder connection request",
+                text: `${fullName(req.user)} is interested in connecting with you on DevTinder.`,
+                html: `<p><strong>${escapeHtml(fullName(req.user))}</strong> is interested in connecting with you on DevTinder.</p>`
+            });
+        }
+
         res.send({
             message: status == 'interested' ? "Connection Request sent successfully to "+toUser.firstName : "You have "+status+" "+toUser.firstName,
             success: true,
-            data
+            data,
+            ...(getEmailServiceNotice() && { emailServiceNotice: getEmailServiceNotice() })
         })
 
     } catch (error){
@@ -67,10 +91,23 @@ requestRouter.post("/review/:status/:requestId", async (req, res, next)=>{
         connectionRequest.status = status;
         const updatedData = await connectionRequest.save();
 
+        if (status === "accepted") {
+            const fromUser = await UserModel.findById(connectionRequest.fromUserId);
+            if (fromUser) {
+                await sendNotification({
+                    to: fromUser.emailId,
+                    subject: "Your DevTinder connection request was accepted",
+                    text: `${fullName(req.user)} accepted your connection request.`,
+                    html: `<p><strong>${escapeHtml(fullName(req.user))}</strong> accepted your connection request.</p>`
+                });
+            }
+        }
+
         res.send({
             success: true,
             message: "Connection request "+status,
-            data: updatedData
+            data: updatedData,
+            ...(getEmailServiceNotice() && { emailServiceNotice: getEmailServiceNotice() })
         })
     } catch(error){
         next(error);

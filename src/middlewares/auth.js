@@ -28,10 +28,13 @@ const userAuth = async (req, res, next) => {
         if(!token) throw new AppError("Unauthorized user!",401);
 
         const decodedTokenData = await jwt.verify(token, process.env.DEVTINDER_JWT_SECRET_KEY);
-        const {_id} = decodedTokenData;
+        const {_id, tokenVersion} = decodedTokenData;
         const user = await UserModel.findById(_id);
     
         if(!user) throw new AppError("User not found!",404);
+        if (tokenVersion !== user.tokenVersion) {
+            throw new AppError("Session expired! Please login again.", 401);
+        }
     
         req.user = user;
         next();

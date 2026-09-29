@@ -9,6 +9,42 @@ const bcrypt = require("bcrypt");
 const cookieParser = require('cookie-parser');
 const jwt = require("jsonwebtoken");
 const contactEmail = require("../../utils/contactEmail");
+const crypto = require("crypto");
+const validator = require("validator");
+const { sendEmail, getEmailServiceNotice } = require("../../utils/sendEmail");
+
+const OTP_EXPIRY_MS = 5 * 60 * 1000;
+const hashOtp = (otp) => crypto.createHash("sha256").update(otp).digest("hex");
+const createOtp = () => crypto.randomInt(100000, 1000000).toString();
+const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (character) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+}[character]));
+const fullName = (user) => `${user.firstName} ${user.lastName}`.trim();
+
+const sendBestEffortEmail = async (message, purpose) => {
+    try {
+        await sendEmail(message);
+    } catch (error) {
+        console.error(`Unable to send ${purpose} email:`, error.message);
+    }
+};
+
+const sendOtpEmail = async (user, otp, purpose) => {
+    const subject = purpose === "password reset"
+        ? "Your DevTinder password reset code"
+        : "Your DevTinder email verification code";
+    const text = `Hi ${fullName(user)}, your ${purpose} code is ${otp}. It expires in 5 minutes. Do not share this code.`;
+    try {
+        await sendEmail({
+            to: user.emailId,
+            subject,
+            text,
+            html: `<p>Hi ${escapeHtml(fullName(user))},</p><p>Your ${purpose} code is <strong>${otp}</strong>.</p><p>It expires in 5 minutes. Do not share this code.</p>`
+        });
+    } catch (error) {
+        throw new AppError(`Unable to send ${purpose} email. Please try again.`, 502);
+    }
+};
 
 // SignUp API
 authRouter.post("/signup",async(req,res,next)=>{
@@ -38,6 +74,12 @@ authRouter.post("/signup",async(req,res,next)=>{
             skills
         })
         await user.save(); // save in database collection
+        await sendBestEffortEmail({
+            to: user.emailId,
+            subject: "Welcome to DevTinder",
+            text: `Hi ${fullName(user)}, your DevTinder account was created successfully.`,
+            html: `<p>Hi ${escapeHtml(fullName(user))},</p><p>Your DevTinder account was created successfully.</p>`
+        }, "signup");
         
         // console.log("saved the data");
         // const userDocument = await UserModel.findOne({emailId: req.body.emailId}); //returns document/json object
@@ -46,7 +88,8 @@ authRouter.post("/signup",async(req,res,next)=>{
         // 201 status ka matlab hota hai "Created Successfully"
         res.status(201).send({
             message: "User signed up successfully",
-            success: true
+            success: true,
+            ...(getEmailServiceNotice() && { emailServiceNotice: getEmailServiceNotice() })
             // data: { ...req.body, userId }
         });
     } catch(error){
@@ -144,6 +187,117 @@ authRouter.post("/logout", userAuth, async (req,res,next)=>{
         next(error);
     }
 })
+
+
+// Step 1 of a password reset. Always returns the same message to avoid exposing
+// whether an email address is registered.
+const requestPasswordResetOtp = async (req, res, next) => {
+    try {
+        const { emailId } = req.body;
+        if (!emailId || !validator.isEmail(emailId)) {
+            throw new AppError("Email is not valid!", 400);
+        }
+
+        const user = await UserModel.findOne({ emailId: emailId.toLowerCase() });
+        if (user) {
+            const otp = createOtp();
+            user.passwordResetOtpHash = hashOtp(otp);
+            user.passwordResetOtpExpiresAt = new Date(Date.now() + OTP_EXPIRY_MS);
+            await user.save();
+            // Keep this endpoint account-enumeration safe even if SES rejects an
+            // unverified sandbox recipient.
+            try {
+                await sendOtpEmail(user, otp, "password reset");
+            } catch (error) {
+                console.error("Unable to send password reset email:", error.message);
+            }
+        }
+        res.send({
+            success: true,
+            message: "If this email is registered, a password reset code has been sent.",
+            ...(getEmailServiceNotice() && { emailServiceNotice: getEmailServiceNotice() })
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Step 2 of a password reset. Incrementing tokenVersion invalidates every
+// existing login token, including sessions on other devices.
+const resetPasswordWithOtp = async (req, res, next) => {
+    try {
+        const { emailId, otp, newPassword } = req.body;
+        if (!emailId || !validator.isEmail(emailId) || !/^\d{6}$/.test(String(otp || ""))) {
+            throw new AppError("Email or verification code is invalid!", 400);
+        }
+        if (!newPassword || !validator.isStrongPassword(newPassword)) {
+            throw new AppError("Please enter a strong password!", 400);
+        }
+
+        const user = await UserModel.findOne({
+            emailId: emailId.toLowerCase(),
+            passwordResetOtpHash: hashOtp(String(otp)),
+            passwordResetOtpExpiresAt: { $gt: new Date() }
+        });
+        if (!user) throw new AppError("Verification code is invalid or has expired.", 400);
+
+        user.password = await bcrypt.hash(newPassword, 10);
+        user.passwordResetOtpHash = undefined;
+        user.passwordResetOtpExpiresAt = undefined;
+        user.tokenVersion = (user.tokenVersion || 0) + 1;
+        await user.save();
+        res.send({ success: true, message: "Password reset successfully. Please log in again." });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// The frontend calls this when it needs a fresh verification email for the
+// currently signed-in account.
+const requestEmailVerification = async (req, res, next) => {
+    try {
+        const user = req.user;
+        if (user.isEmailVerified) {
+            return res.send({ success: true, message: "Email is already verified." });
+        }
+        const otp = createOtp();
+        user.emailVerificationOtpHash = hashOtp(otp);
+        user.emailVerificationOtpExpiresAt = new Date(Date.now() + OTP_EXPIRY_MS);
+        await user.save();
+        await sendOtpEmail(user, otp, "email verification");
+        res.send({ success: true, message: "Email verification code sent." });
+    } catch (error) {
+        next(error);
+    }
+};
+
+const verifyEmail = async (req, res, next) => {
+    try {
+        const { otp } = req.body;
+        if (!/^\d{6}$/.test(String(otp || ""))) {
+            throw new AppError("Verification code is invalid!", 400);
+        }
+        const user = req.user;
+        if (user.isEmailVerified) {
+            return res.send({ success: true, message: "Email is already verified." });
+        }
+        if (user.emailVerificationOtpHash !== hashOtp(String(otp)) || !user.emailVerificationOtpExpiresAt || user.emailVerificationOtpExpiresAt <= new Date()) {
+            throw new AppError("Verification code is invalid or has expired.", 400);
+        }
+        user.isEmailVerified = true;
+        user.emailVerificationOtpHash = undefined;
+        user.emailVerificationOtpExpiresAt = undefined;
+        await user.save();
+        res.send({ success: true, message: "Email verified successfully." });
+    } catch (error) {
+        next(error);
+    }
+};
+
+authRouter.post(["/forgetPasswordViaOtp", "/forget-password-via-otp"], requestPasswordResetOtp);
+authRouter.post(["/forgetPasswordViaOtp/reset", "/forget-password-via-otp/reset"], resetPasswordWithOtp);
+authRouter.post(["/emailVerification", "/email-verification"], userAuth, requestEmailVerification);
+authRouter.post(["/emailVerification/verify", "/email-verification/verify"], userAuth, verifyEmail);
 
 
 module.exports = {authRouter};
