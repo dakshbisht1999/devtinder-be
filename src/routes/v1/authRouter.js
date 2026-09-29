@@ -8,6 +8,7 @@ const {validateSignupData, validateLoginData, validateEmailData} = require("./..
 const bcrypt = require("bcrypt");
 const cookieParser = require('cookie-parser');
 const jwt = require("jsonwebtoken");
+const contactEmail = require("../../utils/contactEmail");
 
 // SignUp API
 authRouter.post("/signup",async(req,res,next)=>{
@@ -97,28 +98,26 @@ authRouter.post("/email",async(req,res,next)=>{
             emailId, 
             name
         } = req.body;
+
+        const emailRes = await contactEmail.run(emailComingFrom, subject, message, emailId, name);
+        // console.log(emailRes);
         
-        // console.log("saved the data");
-        // const userDocument = await UserModel.findOne({emailId: req.body.emailId}); //returns document/json object
-        // const userId = userDocument._id.toString(); //need to convert _id into string using .toString();
-        // console.log(userId);
-        // 201 status ka matlab hota hai "Created Successfully"
-        res.status(201).send({
-            message: "Email sent successfully",
-            success: true,
-            data: {
-                emailComingFrom,
-                subject,
-                message,
-                emailId, 
-                name
-            }
-        });
+        if(emailRes.$metadata.httpStatusCode === 200){
+            res.status(emailRes.$metadata.httpStatusCode).send({
+                message: "Email sent successfully",
+                success: true,
+                data: {
+                    emailComingFrom,
+                    subject,
+                    message,
+                    emailId, 
+                    name
+                }
+            });
+        }else{
+            throw new AppError('Something went wrong, try sending direct mail.', 500)
+        }
     } catch(error){
-        // res.status(400).send("Error saving the user: ", error);
-        
-        // Agar upar wale throw chalenge, ya database crash hoga, 
-        // toh wo sab yahan aayenge aur Global Handler ke paas chale jayenge
         next(error);
     }
 });
