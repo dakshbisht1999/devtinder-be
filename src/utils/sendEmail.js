@@ -25,11 +25,25 @@ const sendEmail = async ({ to, subject, text, html, from = process.env.EMAIL_FRO
   if (text) body.Text = { Charset: "UTF-8", Data: text };
   if (html) body.Html = { Charset: "UTF-8", Data: html };
 
-  return sesClient.send(new SendEmailCommand({
-    Destination: { ToAddresses: [to] },
-    Message: { Body: body, Subject: { Charset: "UTF-8", Data: subject } },
-    Source: from
-  }));
+  // return sesClient.send(new SendEmailCommand({
+  //   Destination: { ToAddresses: [to] },
+  //   Message: { Body: body, Subject: { Charset: "UTF-8", Data: subject } },
+  //   Source: from
+  // }));
+
+  try {
+    return sesClient.send(new SendEmailCommand({
+      Destination: { ToAddresses: [to] },
+      Message: { Body: body, Subject: { Charset: "UTF-8", Data: subject } },
+      Source: from
+    }));
+  } catch (caught) {
+    if (caught instanceof Error && caught.name === "MessageRejected") {
+      const messageRejectedError = caught;
+      return messageRejectedError;
+    }
+    throw caught;
+  }
 };
 
 module.exports = { sendEmail, getEmailServiceNotice };

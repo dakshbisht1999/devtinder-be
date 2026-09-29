@@ -203,13 +203,16 @@ const requestPasswordResetOtp = async (req, res, next) => {
             const otp = createOtp();
             user.passwordResetOtpHash = hashOtp(otp);
             user.passwordResetOtpExpiresAt = new Date(Date.now() + OTP_EXPIRY_MS);
+            user.passwordResetTokenHash = undefined;
+            user.passwordResetTokenExpiresAt = undefined;
             await user.save();
             // Keep this endpoint account-enumeration safe even if SES rejects an
             // unverified sandbox recipient.
             try {
                 await sendOtpEmail(user, otp, "password reset");
             } catch (error) {
-                console.error("Unable to send password reset email:", error.message);
+                // console.error("Unable to send password reset email:", error.message);
+                throw new AppError(error.message, 502);
             }
         }
         res.send({
@@ -222,16 +225,13 @@ const requestPasswordResetOtp = async (req, res, next) => {
     }
 };
 
-// Step 2 of a password reset. Incrementing tokenVersion invalidates every
-// existing login token, including sessions on other devices.
-const resetPasswordWithOtp = async (req, res, next) => {
+// Step 2: validate the OTP before the frontend shows its new-password form.
+// A short-lived, HTTP-only cookie authorizes the following reset request.
+const verifyPasswordResetOtp = async (req, res, next) => {
     try {
-        const { emailId, otp, newPassword } = req.body;
+        const { emailId, otp } = req.body;
         if (!emailId || !validator.isEmail(emailId) || !/^\d{6}$/.test(String(otp || ""))) {
             throw new AppError("Email or verification code is invalid!", 400);
-        }
-        if (!newPassword || !validator.isStrongPassword(newPassword)) {
-            throw new AppError("Please enter a strong password!", 400);
         }
 
         const user = await UserModel.findOne({
@@ -241,11 +241,61 @@ const resetPasswordWithOtp = async (req, res, next) => {
         });
         if (!user) throw new AppError("Verification code is invalid or has expired.", 400);
 
-        user.password = await bcrypt.hash(newPassword, 10);
+        const resetToken = jwt.sign(
+            { _id: user._id, purpose: "password-reset" },
+            process.env.DEVTINDER_JWT_SECRET_KEY,
+            { expiresIn: Math.floor(OTP_EXPIRY_MS / 1000) }
+        );
         user.passwordResetOtpHash = undefined;
         user.passwordResetOtpExpiresAt = undefined;
+        user.passwordResetTokenHash = hashOtp(resetToken);
+        user.passwordResetTokenExpiresAt = new Date(Date.now() + OTP_EXPIRY_MS);
+        await user.save();
+        res.cookie("passwordResetToken", resetToken, {
+            expires: new Date(Date.now() + OTP_EXPIRY_MS),
+            httpOnly: true,
+            sameSite: "lax"
+        });
+        res.send({ success: true, message: "OTP verified. You may now set a new password." });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Step 3: only a verified, unexpired reset cookie may set a new password.
+// Incrementing tokenVersion invalidates every existing login session.
+const resetPassword = async (req, res, next) => {
+    try {
+        const { newPassword } = req.body;
+        const { passwordResetToken } = req.cookies;
+        if (!newPassword || !validator.isStrongPassword(newPassword)) {
+            throw new AppError("Please enter a strong password!", 400);
+        }
+        if (!passwordResetToken) throw new AppError("Verify your OTP before resetting the password.", 401);
+
+        let resetTokenData;
+        try {
+            resetTokenData = jwt.verify(passwordResetToken, process.env.DEVTINDER_JWT_SECRET_KEY);
+        } catch {
+            throw new AppError("Your password reset session has expired. Request a new OTP.", 401);
+        }
+        if (resetTokenData.purpose !== "password-reset") {
+            throw new AppError("Invalid password reset session.", 401);
+        }
+
+        const user = await UserModel.findOne({
+            _id: resetTokenData._id,
+            passwordResetTokenHash: hashOtp(passwordResetToken),
+            passwordResetTokenExpiresAt: { $gt: new Date() }
+        });
+        if (!user) throw new AppError("Your password reset session has expired. Request a new OTP.", 401);
+
+        user.password = await bcrypt.hash(newPassword, 10);
+        user.passwordResetTokenHash = undefined;
+        user.passwordResetTokenExpiresAt = undefined;
         user.tokenVersion = (user.tokenVersion || 0) + 1;
         await user.save();
+        res.clearCookie("passwordResetToken");
         res.send({ success: true, message: "Password reset successfully. Please log in again." });
     } catch (error) {
         next(error);
@@ -295,7 +345,8 @@ const verifyEmail = async (req, res, next) => {
 };
 
 authRouter.post(["/forgetPasswordViaOtp", "/forget-password-via-otp"], requestPasswordResetOtp);
-authRouter.post(["/forgetPasswordViaOtp/reset", "/forget-password-via-otp/reset"], resetPasswordWithOtp);
+authRouter.post(["/forgetPasswordViaOtp/verify", "/forget-password-via-otp/verify"], verifyPasswordResetOtp);
+authRouter.post(["/forgetPasswordViaOtp/reset", "/forget-password-via-otp/reset"], resetPassword);
 authRouter.post(["/emailVerification", "/email-verification"], userAuth, requestEmailVerification);
 authRouter.post(["/emailVerification/verify", "/email-verification/verify"], userAuth, verifyEmail);
 
