@@ -26,6 +26,8 @@ requestRouter.post("/send/:status/:toUserId", async (req, res, next)=>{
         const toUserId = req.params.toUserId;
         const status = req.params.status; // status: interested, ignored
 
+        if(!req.user.isEmailVerified) throw new AppError("User is not verified",400);
+
         // check if fromUserId is same as toUserId in the mongoose.Schema using pre middleware
 
         const toUser = await UserModel.findById(toUserId);
@@ -73,6 +75,8 @@ requestRouter.post("/review/:status/:requestId", async (req, res, next)=>{
         const status = req.params.status; // status: accepted, rejected
         const requestId = req.params.requestId;
         const toUserId = req.user._id; // loggedIn User
+
+        if(!req.user.isEmailVerified) throw new AppError("User is not verified",400);
 
         // validate status
         const allowedStatuses = ["accepted", "rejected"];

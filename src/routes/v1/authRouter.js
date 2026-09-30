@@ -315,7 +315,11 @@ const requestEmailVerification = async (req, res, next) => {
         user.emailVerificationOtpExpiresAt = new Date(Date.now() + OTP_EXPIRY_MS);
         await user.save();
         await sendOtpEmail(user, otp, "email verification");
-        res.send({ success: true, message: "Email verification code sent." });
+        res.send({ 
+            success: true, 
+            message: "Email verification code sent.",
+            ...(getEmailServiceNotice() && { emailServiceNotice: getEmailServiceNotice() })
+        });
     } catch (error) {
         next(error);
     }
