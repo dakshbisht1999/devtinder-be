@@ -12,6 +12,7 @@ const contactEmail = require("../../utils/contactEmail");
 const crypto = require("crypto");
 const validator = require("validator");
 const { sendEmail, getEmailServiceNotice } = require("../../utils/sendEmail");
+const { OAuth2Client } = require("google-auth-library");
 
 const OTP_EXPIRY_MS = 5 * 60 * 1000;
 const hashOtp = (otp) => crypto.createHash("sha256").update(otp).digest("hex");
@@ -20,6 +21,20 @@ const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (character) => (
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
 }[character]));
 const fullName = (user) => `${user.firstName} ${user.lastName}`.trim();
+
+const googleClient = new OAuth2Client();
+
+const sendAuthenticatedUser = async (user, res, message, extra = {}) => {
+    const token = await user.getJWT();
+    res.cookie("token", token, {
+        expires: new Date(Date.now() + 8 * 3600000),
+        httpOnly: true,
+        sameSite: "lax"
+    });
+    const userObj = user.toObject();
+    delete userObj.password;
+    res.send({ message, success: true, data: userObj, ...extra });
+};
 
 const sendBestEffortEmail = async (message, purpose) => {
     try {
@@ -107,24 +122,85 @@ authRouter.post("/login", async (req,res,next)=>{
         const user = await validateLoginData(req);
         await user.validatePassword(req.body.password);
         
-        const token = await user.getJWT();
-        
-        res.cookie("token", token, {
-            expires: new Date(Date.now() + 8 * 3600000), // expires in 8 hours
-            httpOnly: true
-        });
-        const userObj = user.toObject();
-        delete userObj.password;
-        res.send({
-            message: "User logged in successfully",
-            // token: token, removed because of security reasons
-            success: true,
-            data: userObj
-        })
+        await sendAuthenticatedUser(user, res, "User logged in successfully");
     } catch(error){
         next(error);
     }
     
+});
+
+// Google sends an ID token to the frontend. Verify it here before using any
+// claim from it, then create/link the DevTinder account and issue our own JWT.
+authRouter.post("/google", async (req, res, next) => {
+    try {
+        const { token } = req.body;
+        if (!token || typeof token !== "string") {
+            throw new AppError("Google credential is required.", 400);
+        }
+        if (!process.env.GOOGLE_CLIENT_ID) {
+            throw new AppError("Google login is not configured on this server.", 503);
+        }
+
+        let payload;
+        try {
+            const ticket = await googleClient.verifyIdToken({
+                idToken: token,
+                audience: process.env.GOOGLE_CLIENT_ID
+            });
+            payload = ticket.getPayload();
+        } catch {
+            throw new AppError("Invalid or expired Google credential.", 401);
+        }
+
+        const emailId = payload?.email?.toLowerCase();
+        const isGoogleAuthoritative = emailId?.endsWith("@gmail.com") || Boolean(payload?.hd);
+        if (!payload?.sub || !emailId || !payload.email_verified || !isGoogleAuthoritative) {
+            throw new AppError("Google could not verify ownership of this email address.", 401);
+        }
+
+        let user = await UserModel.findOne({ googleId: payload.sub });
+        let isNewUser = false;
+
+        if (!user) {
+            user = await UserModel.findOne({ emailId });
+            if (user) {
+                if (user.googleId && user.googleId !== payload.sub) {
+                    throw new AppError("This email is already linked to a different Google account.", 409);
+                }
+                // Google has proven ownership of this Gmail/Workspace address,
+                // so it is safe to link the existing local account.
+                user.googleId = payload.sub;
+                user.isEmailVerified = true;
+                await user.save();
+            } else {
+                const names = (payload.name || "").trim().split(/\s+/).filter(Boolean);
+                const givenName = payload.given_name || names[0];
+                const familyName = payload.family_name || names.slice(1).join(" ");
+                user = new UserModel({
+                    // The local schema requires a minimum of three characters.
+                    firstName: givenName?.trim().length >= 3 ? givenName.trim() : "Google",
+                    lastName: familyName?.trim().length >= 3 ? familyName.trim() : "User",
+                    emailId,
+                    photoUrl: payload.picture,
+                    authProvider: "google",
+                    googleId: payload.sub,
+                    isEmailVerified: true,
+                    isProfileComplete: false
+                });
+                await user.save();
+                isNewUser = true;
+            }
+        }
+
+        await sendAuthenticatedUser(
+            user,
+            res,
+            "User logged in successfully",
+            { isNewUser }
+        );
+    } catch (error) {
+        next(error);
+    }
 });
 
 // Temp Email check API

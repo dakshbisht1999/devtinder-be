@@ -33,7 +33,9 @@ const userSchema = new mongoose.Schema({
     },
     password:{
         type: String,
-        required: true,
+        required: function () {
+            return (this.authProvider || "local") === "local";
+        },
         validate(value){
             if(!validator.isStrongPassword(value)){
                 throw new AppError("Password is not strong: " + value,400)
@@ -57,11 +59,15 @@ const userSchema = new mongoose.Schema({
     },
     dob:{
         type: String,
-        required: true
+        required: function () {
+            return (this.authProvider || "local") === "local";
+        }
     },
     age:{
         type: Number,
-        required: true,
+        required: function () {
+            return (this.authProvider || "local") === "local";
+        },
         min: 18,
         max: 100
     },
@@ -95,6 +101,26 @@ const userSchema = new mongoose.Schema({
         type: Number,
         default: 0
     },
+    authProvider: {
+        type: String,
+        enum: ["local", "google"],
+        default: "local"
+    },
+    googleId: {
+        type: String,
+        unique: true,
+        sparse: true
+    },
+    isProfileComplete: {
+        type: Boolean,
+        default: true
+    },
+    hasPassword: {
+        type: Boolean,
+        default: function () {
+            return (this.authProvider || "local") === "local";
+        },
+    }
     // roles: {
     //     type: [String],
     //     enum: ['user', 'editor', 'admin'],
@@ -123,6 +149,7 @@ userSchema.methods.getJWT = async function() {
 
 userSchema.methods.validatePassword = async function (plainPassword){
     const user = this;
+    if(!user.password) throw new AppError("Invalid Credentials!!", 401);
     const isPasswordMatch = await bcrypt.compare(plainPassword, user.password);
     if(!isPasswordMatch) throw new AppError("Invalid Credentials!!", 401);
 };

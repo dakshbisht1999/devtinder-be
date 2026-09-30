@@ -4,12 +4,15 @@
 
 POST - /auth/signup
 POST - /auth/login
+POST - /auth/google                         // body: { token }; verified Google ID token
 POST - /auth/logout
 POST - /auth/forget-password-via-otp        // body: { emailId }; sends a six-digit OTP
 POST - /auth/forget-password-via-otp/verify // body: { emailId, otp }; unlocks the new-password screen
 POST - /auth/forget-password-via-otp/reset  // body: { newPassword }; requires the verified reset cookie
 POST - /auth/email-verification              // authenticated; sends a six-digit OTP
 POST - /auth/email-verification/verify       // authenticated; body: { otp }
+
+Google login requires `GOOGLE_CLIENT_ID` in the backend environment. It must equal the Web OAuth client ID configured in the React `GoogleOAuthProvider`.
 
 
 # profileRouter
