@@ -94,6 +94,9 @@ profileRouter.delete("/delete", async(req,res,next)=>{
         });
         if(!deletedConnections) throw new AppError("Unable to delete connections",500)
         
+        res.cookie("token", null, {
+            expires: new Date(Date.now())
+        });
         
         res.send({
             message: "User profile deleted successfully",
