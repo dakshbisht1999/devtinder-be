@@ -383,8 +383,14 @@ Designed for high scalability and advanced system design discussions:
 ## 👨‍💻 Author
 
 **Dishant Bisht**
-- GitHub: [@dakshbisht1999](https://github.com/dakshbisht1999)
-- Portfolio / Domain: [dishantbisht.in](https://dishantbisht.in)
+*Full-Stack Software Engineer · GenAI Engineer*
+
+- **Website**: [dishantbisht.in](https://dishantbisht.in)
+- **LinkedIn**: [linkedin.com/in/dishantbisht](https://linkedin.com/in/dishantbisht)
+- **GitHub**: [@dakshbisht1999](https://github.com/dakshbisht1999)
+- **NamasteDev**: [@dakshbisht1999](https://namastedev.com/dakshbisht1999)
+- **Email**: [dakshbisht1999@gmail.com](mailto:dakshbisht1999@gmail.com)
+- **Other Projects**: [DevTinder (Live)](https://devtinder.dishantbisht.in) · [Frontend Code](https://github.com/dakshbisht1999/devtinder-fe) · [Backend Code](https://github.com/dakshbisht1999/devtinder-be)
 
 ---
 
