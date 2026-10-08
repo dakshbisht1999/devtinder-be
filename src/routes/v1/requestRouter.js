@@ -4,7 +4,7 @@ const requestRouter = express.Router();
 const { UserModel } = require("./../../models/user");
 const {AppError} = require("./../../utils/AppError");
 const { connectionRequestModel } = require("../../models/connectionRequest");
-const { sendEmail, getEmailServiceNotice } = require("../../utils/sendEmail");
+const { sendEmail, getEmailServiceNotice } = require("../../emails/sendEmail");
 
 const fullName = (user) => `${user.firstName} ${user.lastName}`.trim();
 const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (character) => ({

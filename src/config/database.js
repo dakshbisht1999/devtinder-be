@@ -1,5 +1,4 @@
 const mongoose = require("mongoose");
-require("dotenv").config();
 
 const connectDB = async () => {
     // console.log("mongo_uri_devtinder", process.env.MONGO_URI_DEVTINDER)

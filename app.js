@@ -1,4 +1,8 @@
-// console.log("Hello, World!");
+// fetching .env variables
+require("dotenv").config();
+
+// running cron jobs
+require("./src/cron/sendConnectionReminders");
 
 const express = require("express");
 const {connectDB} = require("./src/config/database");
@@ -11,6 +15,7 @@ const { userRouter } = require("./src/routes/v1/userRouter");
 const {corsConfig} = require("./src/middlewares/cors");
 
 const app = express();
+
 
 //To connect multiple dbs
 // Promise.all([mainDB.asPromise(), adminDB.asPromise()])

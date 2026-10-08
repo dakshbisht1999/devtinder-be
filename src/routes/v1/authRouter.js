@@ -8,10 +8,10 @@ const {validateSignupData, validateLoginData, validateEmailData} = require("./..
 const bcrypt = require("bcrypt");
 const cookieParser = require('cookie-parser');
 const jwt = require("jsonwebtoken");
-const contactEmail = require("../../utils/contactEmail");
+const contactEmail = require("../../emails/contactEmail");
 const crypto = require("crypto");
 const validator = require("validator");
-const { sendEmail, getEmailServiceNotice } = require("../../utils/sendEmail");
+const { sendEmail, getEmailServiceNotice } = require("../../emails/sendEmail");
 const { OAuth2Client } = require("google-auth-library");
 
 const OTP_EXPIRY_MS = 5 * 60 * 1000;
