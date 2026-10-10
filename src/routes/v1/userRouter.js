@@ -187,6 +187,27 @@ userRouter.delete("/connection/remove/:connectionId", async (req,res,next)=>{
     }
 })
 
+// GET Profile API - by email
+userRouter.get("/profile/:publicUserId", async(req,res,next)=>{
+    try{
+        const publicUserId = req.params.publicUserId;
+
+        const user = await UserModel.findById(publicUserId).select(
+            "firstName lastName photoUrl gender age about skills isPremium"
+        );
+        if(!user){
+            throw new AppError("User not found",404);
+        }
+
+        res.status(200).json({
+            success: true,
+            data: user
+        });
+    } catch (error) {
+        next(error);
+    }
+});
+
 // GET - Feed API
 userRouter.get("/feed", async(req,res,next)=>{
     try{

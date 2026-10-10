@@ -5,6 +5,7 @@ require("dotenv").config();
 require("./src/cron/sendConnectionReminders");
 
 const express = require("express");
+const http = require("http"); // Native Node HTTP module
 const {connectDB} = require("./src/config/database");
 const {adminAuth, userAuth} = require("./src/middlewares/auth");
 const cookieParser = require('cookie-parser');
@@ -13,6 +14,9 @@ const { profileRouter } = require("./src/routes/v1/profileRouter");
 const { requestRouter } = require("./src/routes/v1/requestRouter");
 const { userRouter } = require("./src/routes/v1/userRouter");
 const {corsConfig} = require("./src/middlewares/cors");
+const { initializeSocket } = require("./src/utils/socket");
+const { getCurrentWeekIdentifier } = require("./src/utils/weekIdentifier");
+const messageRouter = require("./src/routes/v1/messageRouter");
 
 const app = express();
 
@@ -44,12 +48,11 @@ connectDB()
     app.use("/api/v1/profile", userAuth, profileRouter);
     app.use("/api/v1/request", userAuth, requestRouter);
     app.use("/api/v1/user", userAuth, userRouter);
+    app.use("/api/v1/message", userAuth, messageRouter)
 
 
     // Applying Auth on all "/admin" routes
     app.use("/admin", adminAuth);
-
-
 
     
     //Global Error Handler
@@ -105,9 +108,22 @@ connectDB()
         })
     });
 
-    app.listen(process.env.PORT,()=>{
-        console.log("Server running on port:7777");
+
+    // Create an HTTP server wrapping your Express app
+    const server = http.createServer(app); 
+
+    getCurrentWeekIdentifier();
+    initializeSocket(server);
+    
+
+    // IMPORTANT: Change app.listen to server.listen!
+    server.listen(process.env.PORT, () => {
+        console.log(`Server & WebSockets running on port:7777`);
     });
+
+    // app.listen(process.env.PORT,()=>{
+    //     console.log("Server running on port:7777");
+    // });
 }).catch((err)=>{
     // console.log(err);
     console.error("Database cannot be connected!!", err);

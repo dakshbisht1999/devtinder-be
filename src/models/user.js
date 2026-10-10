@@ -120,12 +120,26 @@ const userSchema = new mongoose.Schema({
         default: function () {
             return (this.authProvider || "local") === "local";
         },
-    }
+    },
     // roles: {
     //     type: [String],
     //     enum: ['user', 'editor', 'admin'],
     //     default: ['user']
     // }
+
+    // models/user.js (Add inside your existing schema)
+    freeChatsUsed: { 
+        type: Number, 
+        default: 0 
+    },
+    lastFreeChatWeek: { 
+        type: String, 
+        default: "" // Will store strings like "2026-W41"
+    },
+    isPremium: { 
+        type: Boolean, 
+        default: false // Prepping for Phase 2
+    }
 }, {
     timestamps: true // automatically adds createdAt and updatedAt fields to every new User.
 });
