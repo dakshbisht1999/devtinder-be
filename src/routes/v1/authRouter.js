@@ -370,6 +370,7 @@ const resetPassword = async (req, res, next) => {
         user.passwordResetTokenHash = undefined;
         user.passwordResetTokenExpiresAt = undefined;
         user.tokenVersion = (user.tokenVersion || 0) + 1;
+        user.hasPassword = true;
         await user.save();
         res.clearCookie("passwordResetToken");
         res.send({ success: true, message: "Password reset successfully. Please log in again." });
