@@ -121,8 +121,8 @@ const userSchema = new mongoose.Schema({
             return (this.authProvider || "local") === "local";
         },
     },
-    roles: {
-        type: [String],
+    role: {
+        type: String,
         enum: ['user', 'editor', 'admin'],
         default: ['user']
     },
