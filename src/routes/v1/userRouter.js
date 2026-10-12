@@ -5,7 +5,7 @@ const { UserModel } = require("./../../models/user");
 const {AppError} = require("./../../utils/AppError");
 const { connectionRequestModel } = require("../../models/connectionRequest");
 
-const USER_SAFE_DATA = ["firstName", "lastName", "photoUrl", "gender", "age", "about", "skills", "roles"];
+const USER_SAFE_DATA = ["firstName", "lastName", "photoUrl", "gender", "age", "about", "skills", "role"];
 
 userRouter.get("/requests/received", async (req,res,next)=>{
     try{
