@@ -316,7 +316,7 @@ userRouter.get("/search", async (req, res) => {
                     ]
                 }
             ]
-        }).select("firstName lastName photoUrl age gender about skills roles");
+        }).select(USER_SAFE_DATA);
 
         res.json({ success: true, data: users });
     } catch (err) {
