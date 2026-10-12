@@ -121,11 +121,11 @@ const userSchema = new mongoose.Schema({
             return (this.authProvider || "local") === "local";
         },
     },
-    // roles: {
-    //     type: [String],
-    //     enum: ['user', 'editor', 'admin'],
-    //     default: ['user']
-    // }
+    roles: {
+        type: [String],
+        enum: ['user', 'editor', 'admin'],
+        default: ['user']
+    },
 
     // models/user.js (Add inside your existing schema)
     freeChatsUsed: { 

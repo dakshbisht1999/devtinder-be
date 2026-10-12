@@ -5,7 +5,7 @@ const { UserModel } = require("./../../models/user");
 const {AppError} = require("./../../utils/AppError");
 const { connectionRequestModel } = require("../../models/connectionRequest");
 
-const USER_SAFE_DATA = ["firstName", "lastName", "photoUrl", "gender", "age", "about", "skills"];
+const USER_SAFE_DATA = ["firstName", "lastName", "photoUrl", "gender", "age", "about", "skills", "roles"];
 
 userRouter.get("/requests/received", async (req,res,next)=>{
     try{
@@ -273,6 +273,54 @@ userRouter.get("/feed", async(req,res,next)=>{
         });
     } catch (error) {
         next(error);
+    }
+});
+
+// Add this route
+userRouter.get("/search", async (req, res) => {
+    try {
+        const searchQuery = req.query.q;
+        if (!searchQuery) {
+            return res.json({ success: true, data: [] });
+        }
+
+        const loggedInUser = req.user;
+
+        // 1. Find all connections (pending, accepted, rejected, ignored) involving the logged-in user
+        const existingConnections = await connectionRequestModel.find({
+            $or: [
+                { fromUserId: loggedInUser._id },
+                { toUserId: loggedInUser._id }
+            ]
+        });
+
+        // 2. Create an array of User IDs that should be hidden from search results
+        const hideUsersFromSearch = new Set();
+        
+        existingConnections.forEach((req) => {
+            hideUsersFromSearch.add(req.fromUserId.toString());
+            hideUsersFromSearch.add(req.toUserId.toString());
+        });
+        
+        // Explicitly add the logged-in user to the hide list just in case they have no connections yet
+        hideUsersFromSearch.add(loggedInUser._id.toString());
+
+        // 3. Perform the search query EXCLUDING those hidden users
+        const users = await UserModel.find({
+            $and: [
+                { _id: { $nin: Array.from(hideUsersFromSearch) } }, // 🚀 The Exclusion Logic
+                {
+                    $or: [
+                        { firstName: { $regex: searchQuery, $options: "i" } },
+                        { lastName: { $regex: searchQuery, $options: "i" } }
+                    ]
+                }
+            ]
+        }).select("firstName lastName photoUrl age gender about skills roles");
+
+        res.json({ success: true, data: users });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
     }
 });
 
